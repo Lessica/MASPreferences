@@ -29,7 +29,7 @@ __attribute__((__visibility__("default")))
 {
 @private
     NSMutableArray *_viewControllers;
-    NSMutableDictionary *_minimumViewRects;
+    NSMutableDictionary *_fixedViewRects;
     NSString *_title;
     NSViewController <MASPreferencesViewController> *_selectedViewController;
     NSToolbar * __unsafe_unretained _toolbar;

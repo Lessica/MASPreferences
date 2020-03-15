@@ -43,7 +43,7 @@ static NSString * PreferencesKeyForViewBounds (NSString *identifier)
     if ((self = [super initWithWindowNibPath:nibPath owner:self]))
     {
 		_viewControllers = [viewControllers mutableCopy];
-        _minimumViewRects = [[NSMutableDictionary alloc] init];
+        _fixedViewRects = [[NSMutableDictionary alloc] init];
         _title = [title copy];
     }
     return self;
@@ -89,7 +89,9 @@ static NSString * PreferencesKeyForViewBounds (NSString *identifier)
     NSString *origin = [[NSUserDefaults standardUserDefaults] stringForKey:kMASPreferencesFrameTopLeftKey];
     if (origin)
     {
-        [self.window layoutIfNeeded];
+        if (@available(macOS 10.7, *)) {
+            [self.window layoutIfNeeded];
+        }
         [self.window setFrameTopLeftPoint:NSPointFromString(origin)];
     }
 
@@ -216,9 +218,11 @@ static NSString * PreferencesKeyForViewBounds (NSString *identifier)
         [self.window setContentView:[[NSView alloc] init]];
         [_selectedViewController setNextResponder:nil];
         // With 10.10 and later AppKit will invoke viewDidDisappear so we need to prevent it from being called twice.
-        if (![NSViewController instancesRespondToSelector:@selector(viewDidDisappear)])
-            if ([_selectedViewController respondsToSelector:@selector(viewDidDisappear)])
-                [_selectedViewController viewDidDisappear];
+        if (@available(macOS 10.10, *)) {
+            if (![NSViewController instancesRespondToSelector:@selector(viewDidDisappear)])
+                if ([_selectedViewController respondsToSelector:@selector(viewDidDisappear)])
+                    [_selectedViewController viewDidDisappear];
+        }
         _selectedViewController = nil;
     }
 
@@ -239,11 +243,11 @@ static NSString * PreferencesKeyForViewBounds (NSString *identifier)
     
     NSView *controllerView = controller.view;
 
-    // Retrieve current and minimum frame size for the view
+    // Retrieve current and fixed frame size for the view
     NSString *oldViewRectString = [[NSUserDefaults standardUserDefaults] stringForKey:PreferencesKeyForViewBounds(controller.viewIdentifier)];
-    NSString *minViewRectString = [_minimumViewRects objectForKey:controller.viewIdentifier];
-    if (!minViewRectString)
-        [_minimumViewRects setObject:NSStringFromRect(controllerView.bounds) forKey:controller.viewIdentifier];
+    NSString *fixedViewRectString = [_fixedViewRects objectForKey:controller.viewIdentifier];
+    if (!fixedViewRectString)
+        [_fixedViewRects setObject:NSStringFromRect(controllerView.bounds) forKey:controller.viewIdentifier];
     
     BOOL sizableWidth = ([controller respondsToSelector:@selector(hasResizableWidth)]
                          ? controller.hasResizableWidth
@@ -253,9 +257,9 @@ static NSString * PreferencesKeyForViewBounds (NSString *identifier)
                           : controllerView.autoresizingMask & NSViewHeightSizable);
     
     NSRect oldViewRect = oldViewRectString ? NSRectFromString(oldViewRectString) : controllerView.bounds;
-    NSRect minViewRect = minViewRectString ? NSRectFromString(minViewRectString) : controllerView.bounds;
-    oldViewRect.size.width  = NSWidth(oldViewRect)  < NSWidth(minViewRect)  || !sizableWidth  ? NSWidth(minViewRect)  : NSWidth(oldViewRect);
-    oldViewRect.size.height = NSHeight(oldViewRect) < NSHeight(minViewRect) || !sizableHeight ? NSHeight(minViewRect) : NSHeight(oldViewRect);
+    NSRect fixedViewRect = fixedViewRectString ? NSRectFromString(fixedViewRectString) : controllerView.bounds;
+    oldViewRect.size.width  = !sizableWidth  ? NSWidth(fixedViewRect)  : NSWidth(oldViewRect) ;
+    oldViewRect.size.height = !sizableHeight ? NSHeight(fixedViewRect) : NSHeight(oldViewRect);
 
     [controllerView setFrame:oldViewRect];
 
@@ -265,7 +269,7 @@ static NSString * PreferencesKeyForViewBounds (NSString *identifier)
     newFrame = NSOffsetRect(newFrame, NSMinX(oldFrame), NSMaxY(oldFrame) - NSMaxY(newFrame));
 
     // Setup min/max sizes and show/hide resize indicator
-    [self.window setContentMinSize:minViewRect.size];
+    [self.window setContentMinSize:oldViewRect.size];
     [self.window setContentMaxSize:NSMakeSize(sizableWidth ? CGFLOAT_MAX : NSWidth(oldViewRect), sizableHeight ? CGFLOAT_MAX : NSHeight(oldViewRect))];
     [self.window setShowsResizeIndicator:sizableWidth || sizableHeight];
     [[self.window standardWindowButton:NSWindowZoomButton] setEnabled:sizableWidth || sizableHeight];
@@ -277,9 +281,11 @@ static NSString * PreferencesKeyForViewBounds (NSString *identifier)
     // In OSX 10.10, setContentView below calls viewWillAppear.  We still want to call viewWillAppear on < 10.10,
     // so the check below avoids calling viewWillAppear twice on 10.10.
     // See https://github.com/shpakovski/MASPreferences/issues/32 for more info.
-    if (![NSViewController instancesRespondToSelector:@selector(viewWillAppear)])
-        if ([controller respondsToSelector:@selector(viewWillAppear)])
-            [controller viewWillAppear];
+    if (@available(macOS 10.10, *)) {
+        if (![NSViewController instancesRespondToSelector:@selector(viewWillAppear)])
+            if ([controller respondsToSelector:@selector(viewWillAppear)])
+                [controller viewWillAppear];
+    }
     
     [self.window setContentView:controllerView];
     [self.window recalculateKeyViewLoop];
